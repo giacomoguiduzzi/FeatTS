@@ -261,60 +261,53 @@ def randomFeat(ris, numberFeatUse):
 
     return randomFeat
 
-def profile_community_detection_train(features, features_filtered_direct, listOfId, threshold, clusterK, chooseAlgorithm):
-    with open(f"memory_profiler_{datetime.now().strftime('%d_%m_%Y_%H_%M')}.log", "w+") as log_file:
-        @memory_profiler.profile(
-            precision=2,
-            stream=log_file
-        )
-        def getCommunityDetectionTrain(features, features_filtered_direct, listOfId, threshold, clusterK, chooseAlgorithm):
-            dictOfInfo = {}
 
-            for feature in features:
-                G = nx.Graph()
-                H = nx.path_graph(listOfId)
-                G.add_nodes_from(H)
+def getCommunityDetectionTrain(features, features_filtered_direct, listOfId, threshold, clusterK, chooseAlgorithm):
+    dictOfInfo = {}
 
-                # Convert the feature column to a numpy array for efficient operations
-                values = features_filtered_direct[feature].to_numpy()
-                # Calculate the pairwise absolute differences using broadcasting
-                diff_matrix = np.abs(values[:, np.newaxis] - values)
-                # Extract the upper triangle of the matrix, excluding the diagonal
-                listOfDistance = diff_matrix[np.triu_indices(len(values), k=1)]
-                # Find the threshold index
-                threshold_index = int(len(listOfDistance) * threshold)
-                # Use numpy's partition to find the threshold value without full sorting
-                distanceMinAccept = np.partition(listOfDistance, threshold_index)[threshold_index]
+    for feature in features:
+        G = nx.Graph()
+        H = nx.path_graph(listOfId)
+        G.add_nodes_from(H)
 
-                for i, j in combinations(range(len(listOfId)), 2):
-                    if diff_matrix[i, j] < distanceMinAccept:
-                        G.add_edge(i, j)
+        # Convert the feature column to a numpy array for efficient operations
+        values = features_filtered_direct[feature].to_numpy()
+        # Calculate the pairwise absolute differences using broadcasting
+        diff_matrix = np.abs(values[:, np.newaxis] - values)
+        # Extract the upper triangle of the matrix, excluding the diagonal
+        listOfDistance = diff_matrix[np.triu_indices(len(values), k=1)]
+        # Find the threshold index
+        threshold_index = int(len(listOfDistance) * threshold)
+        # Use numpy's partition to find the threshold value without full sorting
+        distanceMinAccept = np.partition(listOfDistance, threshold_index)[threshold_index]
 
-                try:
-                    if list(chooseAlgorithm.keys())[0] == 'SLPA':
-                        extrC = SLPA.find_communities(G, chooseAlgorithm['SLPA']['iteration'],
-                                                      chooseAlgorithm['SLPA']['radious'])
-                        coms = []
-                        for val in extrC:
-                            coms.append(frozenset(extrC[val]))
-                    elif list(chooseAlgorithm.keys())[0] == 'kClique':
-                        coms = list(nx.algorithms.community.k_clique_communities(G, chooseAlgorithm['SLPA']['trainClique']))
-                    elif list(chooseAlgorithm.keys())[0] == 'Greedy':
-                        coms = list(nx.algorithms.community.greedy_modularity_communities(G))
+        for i, j in combinations(range(len(listOfId)), 2):
+            if diff_matrix[i, j] < distanceMinAccept:
+                G.add_edge(i, j)
 
-                    if len(coms) > clusterK:
-                        dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
-                                               "weightFeat": clusterK / len(coms)}
-                    else:
-                        dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
-                                               "weightFeat": len(coms) / clusterK}
+        try:
+            if list(chooseAlgorithm.keys())[0] == 'SLPA':
+                extrC = SLPA.find_communities(G, chooseAlgorithm['SLPA']['iteration'],
+                                              chooseAlgorithm['SLPA']['radious'])
+                coms = []
+                for val in extrC:
+                    coms.append(frozenset(extrC[val]))
+            elif list(chooseAlgorithm.keys())[0] == 'kClique':
+                coms = list(nx.algorithms.community.k_clique_communities(G, chooseAlgorithm['SLPA']['trainClique']))
+            elif list(chooseAlgorithm.keys())[0] == 'Greedy':
+                coms = list(nx.algorithms.community.greedy_modularity_communities(G))
 
-                except Exception as e:
-                    print(e)
-                    pass
-            return dictOfInfo
+            if len(coms) > clusterK:
+                dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
+                                       "weightFeat": clusterK / len(coms)}
+            else:
+                dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
+                                       "weightFeat": len(coms) / clusterK}
 
-        return getCommunityDetectionTrain(features, features_filtered_direct, listOfId, threshold, clusterK, chooseAlgorithm)
+        except Exception as e:
+            print(e)
+            pass
+    return dictOfInfo
 
 
 def cleaning(df: pd.DataFrame) -> pd.DataFrame:

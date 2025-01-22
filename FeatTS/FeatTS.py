@@ -266,8 +266,7 @@ class FeatTS(object):
         with ProcessPoolExecutor(max_workers=self.cm_jobs) as executor:
             futures = [
                 executor.submit(
-                    # util.getCommunityDetectionTrain,
-                    util.profile_community_detection_train,
+                    util.getCommunityDetectionTrain,
                     feature_chunk,
                     features_filtered_direct,
                     list_of_ids,
