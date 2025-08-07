@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from pyclustering.cluster.kmedoids import kmedoids
 import networkx as nx
 from tsfresh import extract_features
-from featts import SLPA
+from . import SLPA
 import numpy as np
 from itertools import combinations
 import memory_profiler
@@ -31,7 +31,7 @@ def adaptTimeSeriesUCR(input_data):
             value_list.append(value)
 
     # Create a DataFrame
-    data = {'id': id_list, 'time': time_list, 'value': value_list}
+    data = {"id": id_list, "time": time_list, "value": value_list}
     df = pd.DataFrame(data)
     return df
 
@@ -84,7 +84,9 @@ def getDataframeAcc(appSeries, perc):
 
 
 def extractFeature(listOut, external_feat=None, n_jobs=1):
-    features_filtered_direct = extract_features(listOut, column_id='id', column_sort='time', n_jobs=n_jobs)
+    features_filtered_direct = extract_features(
+        listOut, column_id="id", column_sort="time", n_jobs=n_jobs
+    )
     if external_feat is not None:
         features_filtered_direct = features_filtered_direct.join(external_feat)
     features_filtered_direct = normalization_data(features_filtered_direct)
@@ -93,13 +95,15 @@ def extractFeature(listOut, external_feat=None, n_jobs=1):
 
 
 def normalization_data(features_filtered_direct):
-    features_filtered_direct = features_filtered_direct.dropna(axis='columns')
+    features_filtered_direct = features_filtered_direct.dropna(axis="columns")
     # Initialize the MinMaxScaler
     scaler = MinMaxScaler()
     # Fit and transform the DataFrame using the scaler
     normalized_data = scaler.fit_transform(features_filtered_direct)
     # Create a new DataFrame with the normalized data
-    features_filtered_direct = pd.DataFrame(normalized_data, columns=features_filtered_direct.columns)
+    features_filtered_direct = pd.DataFrame(
+        normalized_data, columns=features_filtered_direct.columns
+    )
     # Calculate variance for each column
     variance = features_filtered_direct.var()
 
@@ -112,7 +116,7 @@ def normalization_data(features_filtered_direct):
     # Perform K-Means clustering with k=2
     kmeans = KMeans(n_clusters=2, n_init="auto")
     kmeans.fit(X)
-    variance_useless_column = variance[:(list(kmeans.labels_).count(0) - 1)].index
+    variance_useless_column = variance[: (list(kmeans.labels_).count(0) - 1)].index
     features_filtered_direct.drop(columns=variance_useless_column, inplace=True)
 
     return features_filtered_direct
@@ -136,7 +140,9 @@ def getTabNonSym(setCluster, listId, n_jobs=1):
         for i in range(n_jobs):
             start = i * totRig
             end = start + totRig if i < n_jobs - 1 else len(listId)
-            futures.append(executor.submit(getValueMatrix, start, listId, end - start, setCluster))
+            futures.append(
+                executor.submit(getValueMatrix, start, listId, end - start, setCluster)
+            )
 
         for future in futures:
             matrixCalcParal(future.result())
@@ -152,8 +158,10 @@ def getValueMatrix(start, listId, totRig, listOfClust):
     try:
         dictOfValueIJ = []
         # Pre-calcola i risultati di numOfClusterPres per evitare chiamate ripetute
-        cluster_pres_cache = {listId[i + start]: numOfClusterPres(listOfClust, listId[i + start]) for i in
-                              range(totRig)}
+        cluster_pres_cache = {
+            listId[i + start]: numOfClusterPres(listOfClust, listId[i + start])
+            for i in range(totRig)
+        }
 
         for i in range(totRig):
             id_i = listId[i + start]
@@ -187,7 +195,7 @@ def getCluster(matrixsym, setCluster, numClust):
         dictTotal[x] = listOfDist
 
     idChoose = getInitialIndex(dictTotal, numClust)
-    D = pairwise_distances(matrixsym, metric='correlation')
+    D = pairwise_distances(matrixsym, metric="correlation")
 
     kmedoids_instance = kmedoids(D, idChoose, tolerance=0.000001)
     kmedoids_instance.process()
@@ -213,7 +221,7 @@ def numOfClusterPres(setCluster, id):
     countTimes = 0
     for i in range(0, len(setCluster)):
         if id in (setCluster[i]["list"]):
-            countId += (setCluster[i]["weight"])
+            countId += setCluster[i]["weight"]
             countTimes += 1
     return countId, countTimes
 
@@ -252,9 +260,9 @@ def createSet(listOfCommFind, clusterK):
 
 
 def randomFeat(ris, numberFeatUse):
-    ris = ris.dropna(subset=['p_value'])
+    ris = ris.dropna(subset=["p_value"])
 
-    indexNames = ris[ris['relevant'] == True].index
+    indexNames = ris[ris["relevant"] == True].index
 
     ris.drop(indexNames, inplace=True)
     randomFeat = ris.sample(n=numberFeatUse)
@@ -262,7 +270,14 @@ def randomFeat(ris, numberFeatUse):
     return randomFeat
 
 
-def getCommunityDetectionTrain(features, features_filtered_direct, listOfId, threshold, clusterK, chooseAlgorithm):
+def getCommunityDetectionTrain(
+    features,
+    features_filtered_direct,
+    listOfId,
+    threshold,
+    clusterK,
+    chooseAlgorithm,
+):
     dictOfInfo = {}
 
     for feature in features:
@@ -279,30 +294,45 @@ def getCommunityDetectionTrain(features, features_filtered_direct, listOfId, thr
         # Find the threshold index
         threshold_index = int(len(listOfDistance) * threshold)
         # Use numpy's partition to find the threshold value without full sorting
-        distanceMinAccept = np.partition(listOfDistance, threshold_index)[threshold_index]
+        distanceMinAccept = np.partition(listOfDistance, threshold_index)[
+            threshold_index
+        ]
 
         for i, j in combinations(range(len(listOfId)), 2):
             if diff_matrix[i, j] < distanceMinAccept:
                 G.add_edge(i, j)
 
         try:
-            if list(chooseAlgorithm.keys())[0] == 'SLPA':
-                extrC = SLPA.find_communities(G, chooseAlgorithm['SLPA']['iteration'],
-                                              chooseAlgorithm['SLPA']['radious'])
+            if list(chooseAlgorithm.keys())[0] == "SLPA":
+                extrC = SLPA.find_communities(
+                    G,
+                    chooseAlgorithm["SLPA"]["iteration"],
+                    chooseAlgorithm["SLPA"]["radious"],
+                )
                 coms = []
                 for val in extrC:
                     coms.append(frozenset(extrC[val]))
-            elif list(chooseAlgorithm.keys())[0] == 'kClique':
-                coms = list(nx.algorithms.community.k_clique_communities(G, chooseAlgorithm['SLPA']['trainClique']))
-            elif list(chooseAlgorithm.keys())[0] == 'Greedy':
+            elif list(chooseAlgorithm.keys())[0] == "kClique":
+                coms = list(
+                    nx.algorithms.community.k_clique_communities(
+                        G, chooseAlgorithm["SLPA"]["trainClique"]
+                    )
+                )
+            elif list(chooseAlgorithm.keys())[0] == "Greedy":
                 coms = list(nx.algorithms.community.greedy_modularity_communities(G))
 
             if len(coms) > clusterK:
-                dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
-                                       "weightFeat": clusterK / len(coms)}
+                dictOfInfo[feature] = {
+                    "distance": distanceMinAccept,
+                    "cluster": coms,
+                    "weightFeat": clusterK / len(coms),
+                }
             else:
-                dictOfInfo[feature] = {"distance": distanceMinAccept, "cluster": coms,
-                                       "weightFeat": len(coms) / clusterK}
+                dictOfInfo[feature] = {
+                    "distance": distanceMinAccept,
+                    "cluster": coms,
+                    "weightFeat": len(coms) / clusterK,
+                }
 
         except Exception as e:
             print(e)
@@ -312,8 +342,8 @@ def getCommunityDetectionTrain(features, features_filtered_direct, listOfId, thr
 
 def cleaning(df: pd.DataFrame) -> pd.DataFrame:
     # Drop columns which contain nan, +inf, and -inf values
-    df = df.dropna(axis=1, how='any')
-    cond = ((df == float('inf')) | (df == float('-inf'))).any(axis=0)
+    df = df.dropna(axis=1, how="any")
+    cond = ((df == float("inf")) | (df == float("-inf"))).any(axis=0)
     df = df.drop(df.columns[cond], axis=1)
     # Apply a simple variance threshold
     selector = VarianceThreshold()
